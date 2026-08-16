@@ -63,25 +63,25 @@ Dengan **Sistem Rekening Bersama (Escrow)** terintegrasi dan **Proof-of-Work (Li
 
 ```mermaid
 graph TD
-    User([Pengguna: Klien / Talenta / Admin])
+    User(["Pengguna: Klien / Talenta / Admin"])
     
-    subgraph Frontend [Frontend - Next.js 16 (Port 3000)]
-        UI[App Router & Tailwind UI Components]
-        Store[Zustand / LocalStore Hybrid State]
-        WSClient[WebSocket Realtime Toast Provider]
+    subgraph Frontend["Frontend - Next.js 16 (Port 3000)"]
+        UI["App Router & Tailwind UI Components"]
+        Store["Zustand / LocalStore Hybrid State"]
+        WSClient["WebSocket Realtime Toast Provider"]
     end
 
-    subgraph Backend [Backend - Express.js API (Port 5000)]
-        Router[REST Endpoints & Controllers]
-        Cron[48h Auto-Release Background Worker]
-        WSServer[WebSocket Server + Heartbeat Keeper]
-        Prisma[Prisma ORM Client]
+    subgraph Backend["Backend - Express.js API (Port 5000)"]
+        Router["REST Endpoints & Controllers"]
+        Cron["48h Auto-Release Background Worker"]
+        WSServer["WebSocket Server + Heartbeat Keeper"]
+        Prisma["Prisma ORM Client"]
     end
 
-    subgraph CloudDB [Cloud Database - Supabase PostgreSQL]
-        DB[(PostgreSQL Database)]
-        RLS[Row Level Security Active on 8 Tables]
-        Indexes[12 B-Tree Performance Indexes]
+    subgraph CloudDB["Cloud Database - Supabase PostgreSQL"]
+        DB[("PostgreSQL Database")]
+        RLS["Row Level Security Active on 8 Tables"]
+        Indexes["12 B-Tree Performance Indexes"]
     end
 
     User --> UI
