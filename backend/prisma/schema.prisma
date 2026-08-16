@@ -1,0 +1,210 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  TALENT
+  CLIENT
+  ADMIN
+}
+
+enum BountyStatus {
+  DRAFT
+  PENDING_PAYMENT
+  OPEN
+  IN_REVIEW
+  COMPLETED
+  CANCELLED
+  DISPUTED
+}
+
+enum SubmissionStatus {
+  PENDING
+  ACCEPTED
+  REVISION_REQUESTED
+  REJECTED
+}
+
+enum EscrowStatus {
+  HOLD
+  RELEASED
+  REFUNDED
+}
+
+enum DisputeStatus {
+  PENDING_REVIEW
+  INVESTIGATING
+  RESOLVED_RELEASED
+  RESOLVED_REFUNDED
+  RESOLVED_SPLIT
+}
+
+model User {
+  id                     String          @id @default(uuid())
+  email                  String          @unique
+  passwordHash           String?
+  name                   String
+  avatarUrl              String?
+  role                   Role            @default(TALENT)
+  bio                    String?         @db.Text
+  githubUsername         String?
+  reputationScore        Float           @default(5.0)
+  balance                Decimal         @default(0.00) @db.Decimal(12, 2)
+  completedBountiesCount Int             @default(0)
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+
+  portfolios             PortfolioItem[]
+  bountiesOwned          Bounty[]        @relation("ClientBounties")
+  submissions            Submission[]    @relation("TalentSubmissions")
+  reviewsGiven           Review[]        @relation("ReviewsGiven")
+  reviewsRecv            Review[]        @relation("ReviewsReceived")
+  withdrawals            Withdrawal[]
+
+  @@index([role])
+}
+
+model PortfolioItem {
+  id            String   @id @default(uuid())
+  userId        String
+  title         String
+  description   String   @db.Text
+  demoUrl       String
+  repoUrl       String?
+  techTags      String[]
+  lastCheckedAt String?  @default("200 OK")
+  status        String   @default("LIVE")
+  createdAt     DateTime @default(now())
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Bounty {
+  id           String         @id @default(uuid())
+  clientId     String
+  title        String
+  category     String         @default("Frontend Slicing")
+  description  String         @db.Text
+  budget       Decimal        @db.Decimal(12, 2)
+  daysEstimate Int            @default(3)
+  deadline     DateTime
+  status       BountyStatus   @default(OPEN)
+  criteria     String[]
+  techTags     String[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  client       User           @relation("ClientBounties", fields: [clientId], references: [id])
+  escrow       Escrow?
+  submissions  Submission[]
+  disputes     Dispute[]
+  review       Review?
+
+  @@index([clientId])
+  @@index([status])
+  @@index([category])
+  @@index([createdAt])
+}
+
+model Submission {
+  id            String           @id @default(uuid())
+  bountyId      String
+  talentId      String
+  talentName    String?
+  demoUrl       String
+  repoUrl       String?
+  notes         String?          @db.Text
+  status        SubmissionStatus @default(PENDING)
+  revisionCount Int              @default(0)
+  revisionNotes String[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  bounty        Bounty           @relation(fields: [bountyId], references: [id], onDelete: Cascade)
+  talent        User             @relation("TalentSubmissions", fields: [talentId], references: [id])
+  disputes      Dispute[]
+
+  @@index([bountyId])
+  @@index([talentId])
+  @@index([status])
+}
+
+model Escrow {
+  id                String       @id @default(uuid())
+  bountyId          String       @unique
+  amount            Decimal      @db.Decimal(12, 2)
+  feePlatform       Decimal      @db.Decimal(12, 2)
+  netAmount         Decimal      @db.Decimal(12, 2)
+  paymentMethod     String       @default("QRIS")
+  paymentGatewayRef String?
+  status            EscrowStatus @default(HOLD)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  bounty            Bounty       @relation(fields: [bountyId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+model Dispute {
+  id           String        @id @default(uuid())
+  bountyId     String
+  submissionId String?
+  initiatedBy  String
+  reason       String        @db.Text
+  clientNotes  String?       @db.Text
+  talentNotes  String?       @db.Text
+  adminNotes   String?       @db.Text
+  status       DisputeStatus @default(PENDING_REVIEW)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  bounty       Bounty        @relation(fields: [bountyId], references: [id], onDelete: Cascade)
+  submission   Submission?   @relation(fields: [submissionId], references: [id])
+
+  @@index([bountyId])
+  @@index([status])
+}
+
+model Review {
+  id         String   @id @default(uuid())
+  bountyId   String   @unique
+  reviewerId String
+  receiverId String
+  rating     Int      @default(5)
+  comment    String?  @db.Text
+  createdAt  DateTime @default(now())
+
+  bounty     Bounty   @relation(fields: [bountyId], references: [id])
+  reviewer   User     @relation("ReviewsGiven", fields: [reviewerId], references: [id])
+  receiver   User     @relation("ReviewsReceived", fields: [receiverId], references: [id])
+
+  @@index([receiverId])
+  @@index([reviewerId])
+}
+
+model Withdrawal {
+  id              String   @id @default(uuid())
+  userId          String
+  amount          Decimal  @db.Decimal(12, 2)
+  bankName        String
+  accountNum      String
+  accountName     String
+  status          String   @default("PENDING")
+  rejectionReason String?  @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+}
