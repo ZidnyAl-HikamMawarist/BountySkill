@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useAppStore } from '@/lib/store';
+import { RoleGuard } from '@/components/auth/role-guard';
 import { 
   Wallet, 
   CheckCircle2, 
@@ -20,6 +21,14 @@ import {
 import { EmptyState } from '@/components/ui/state-kit';
 
 export default function TalentDashboardPage() {
+  return (
+    <RoleGuard allowedRoles={['TALENT']} pageTitle="Dashboard Talent">
+      <TalentDashboardContent />
+    </RoleGuard>
+  );
+}
+
+function TalentDashboardContent() {
   const { currentUser, bounties } = useAppStore();
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
 

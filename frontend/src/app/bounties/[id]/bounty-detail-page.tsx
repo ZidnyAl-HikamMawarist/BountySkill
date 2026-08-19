@@ -47,7 +47,7 @@ export default function BountyDetailPage({ params }: { params: Promise<{ id: str
   };
 
   const isClientOwner = currentUser?.role === 'CLIENT' && currentUser.id === bounty.clientId;
-  const mySubmission = bounty.submissions?.find(s => s.talentId === (currentUser?.id || 'user-talent-1'));
+  const mySubmission = currentUser ? bounty.submissions?.find(s => s.talentId === currentUser.id) : undefined;
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">

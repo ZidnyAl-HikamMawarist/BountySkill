@@ -15,6 +15,9 @@ const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
 
+// Reverse Proxy Configuration (Cloudflare, Render, Nginx)
+app.set('trust proxy', 1);
+
 // Security Middleware: Helmet HTTP headers (configured for API & CORS)
 app.use(
   helmet({
@@ -47,19 +50,44 @@ app.use(
 
 app.use(express.json({ limit: '10mb' }));
 
-// Rate Limiting: Prevent Brute Force Attacks on Auth endpoints
-const authLimiter = rateLimit({
+// Global API Rate Limiter: Protect against DDoS & Scraping
+const globalApiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: 300, // max 300 requests per 15 min
   standardHeaders: true,
   legacyHeaders: false,
   message: {
     success: false,
-    message: 'Terlalu banyak percobaan autentikasi dari IP ini. Silakan coba lagi setelah 15 menit.'
+    message: 'Terlalu banyak permintaan API. Silakan coba lagi nanti.'
   }
 });
-app.use('/api/auth/login', authLimiter);
-app.use('/api/auth/register', authLimiter);
+app.use('/api', globalApiLimiter);
+
+// Strict Rate Limiting on Login (Prevent Credential Stuffing & Brute Force)
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // Max 10 attempts per IP per 15 minutes
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Terlalu banyak percobaan login gagal dari IP ini. Silakan tunggu 15 menit sebelum mencoba kembali.'
+  }
+});
+app.use('/api/auth/login', loginLimiter);
+
+// Register Rate Limiting (Prevent Bot Account Creation)
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10, // Max 10 registrations per hour per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Batas pendaftaran akun dari IP ini telah tercapai. Silakan coba lagi setelah 1 jam.'
+  }
+});
+app.use('/api/auth/register', registerLimiter);
 
 // Health check endpoint (Render / DevOps ping)
 app.get('/health', (req: Request, res: Response) => {

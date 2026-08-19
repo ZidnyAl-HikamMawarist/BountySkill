@@ -111,6 +111,7 @@ model Bounty {
   @@index([clientId])
   @@index([status])
   @@index([category])
+  @@index([deadline])
   @@index([createdAt])
 }
 
@@ -135,6 +136,7 @@ model Submission {
   @@index([bountyId])
   @@index([talentId])
   @@index([status])
+  @@index([status, updatedAt])
 }
 
 model Escrow {

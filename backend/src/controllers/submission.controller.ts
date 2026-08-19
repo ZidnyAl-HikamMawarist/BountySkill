@@ -23,7 +23,12 @@ export async function submitWork(req: AuthenticatedRequest, res: Response, next:
   try {
     const { bountyId } = req.params;
     const { demoUrl, repoUrl, notes } = req.body;
-    const talentId = req.user?.userId || 'user-talent-1';
+
+    if (!req.user?.userId) {
+      return res.status(401).json({ success: false, message: 'Autentikasi akun diperlukan untuk mengirim hasil pengerjaan.' });
+    }
+
+    const talentId = req.user.userId;
 
     const bounty = await prisma.bounty.findUnique({
       where: { id: bountyId },

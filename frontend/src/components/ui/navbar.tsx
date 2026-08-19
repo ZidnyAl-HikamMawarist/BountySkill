@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
@@ -16,18 +16,53 @@ import {
   Briefcase, 
   FolderGit2, 
   PlusCircle,
-  Gavel
+  Gavel,
+  User,
+  LayoutDashboard,
+  Coins,
+  ShieldAlert
 } from 'lucide-react';
 
 export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { currentUser, switchUserRole, logoutUser } = useAppStore();
+  const { currentUser, logoutUser, isAuthInitialized } = useAppStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [roleMenuOpen, setRoleMenuOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setProfileMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const formatIDR = (amount: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(amount);
+  };
+
+  const handleLogout = () => {
+    setProfileMenuOpen(false);
+    setMobileMenuOpen(false);
+    logoutUser();
+    router.push('/login');
+  };
+
+  const getRoleBadgeStyle = (role?: string) => {
+    switch (role) {
+      case 'ADMIN':
+        return 'bg-amber-500/10 text-amber-400 border-amber-500/30';
+      case 'CLIENT':
+        return 'bg-blue-500/10 text-blue-400 border-blue-500/30';
+      case 'TALENT':
+      default:
+        return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
+    }
   };
 
   return (
@@ -52,7 +87,7 @@ export function Navbar() {
             </Link>
           </div>
 
-          {/* Desktop Nav Links */}
+          {/* Desktop Nav Links (Role-Aware) */}
           <div className="hidden md:flex items-center space-x-6 text-sm font-medium">
             <Link 
               href="/bounties" 
@@ -119,101 +154,185 @@ export function Navbar() {
             )}
           </div>
 
-          {/* Right Action Bar / Profile / Role Switcher */}
+          {/* Right Action Bar / Authenticated Profile */}
           <div className="hidden md:flex items-center gap-4">
             
-            {/* Switch Role Quick Tester Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setRoleMenuOpen(!roleMenuOpen)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container-high border border-outline-variant/60 text-xs font-mono text-on-surface-variant hover:border-primary transition-all active:scale-95"
-                title="Beralih Role Akun untuk Pengujian"
-              >
-                <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
-                <span>Role: <strong className="text-white">{currentUser ? currentUser.role : 'GUEST'}</strong></span>
-                <ChevronDown className="w-3.5 h-3.5" />
-              </button>
-
-              {roleMenuOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-surface-container-high border border-outline-variant rounded-xl shadow-2xl py-2 z-50 animate-in fade-in zoom-in-95">
-                  <div className="px-3 py-1.5 text-[11px] font-mono text-on-surface-variant border-b border-outline-variant/40 mb-1">
-                    GANTI PERAN (TESTING SIMULATOR)
-                  </div>
-                  <button
-                    onClick={() => { switchUserRole('TALENT'); setRoleMenuOpen(false); router.push('/talent/dashboard'); }}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-surface-variant flex items-center justify-between text-white"
-                  >
-                    <span className="flex items-center gap-2"><Code2 className="w-4 h-4 text-emerald-400" /> Talent (Budi Pratama)</span>
-                    {currentUser?.role === 'TALENT' && <span className="text-primary font-mono text-[10px]">AKTIF</span>}
-                  </button>
-                  <button
-                    onClick={() => { switchUserRole('CLIENT'); setRoleMenuOpen(false); router.push('/client/dashboard'); }}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-surface-variant flex items-center justify-between text-white"
-                  >
-                    <span className="flex items-center gap-2"><Briefcase className="w-4 h-4 text-blue-400" /> Client (Kopi Nusantara)</span>
-                    {currentUser?.role === 'CLIENT' && <span className="text-primary font-mono text-[10px]">AKTIF</span>}
-                  </button>
-                  <button
-                    onClick={() => { switchUserRole('ADMIN'); setRoleMenuOpen(false); router.push('/admin/dashboard'); }}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-surface-variant flex items-center justify-between text-white"
-                  >
-                    <span className="flex items-center gap-2"><Gavel className="w-4 h-4 text-amber-400" /> Admin (Dispute Moderator)</span>
-                    {currentUser?.role === 'ADMIN' && <span className="text-primary font-mono text-[10px]">AKTIF</span>}
-                  </button>
-                  <div className="border-t border-outline-variant/40 my-1"></div>
-                  <button
-                    onClick={() => { switchUserRole('GUEST'); setRoleMenuOpen(false); router.push('/'); }}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-surface-variant text-on-surface-variant flex items-center gap-2"
-                  >
-                    <LogOut className="w-4 h-4" /> Mode Tamu / Logout
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Auth / Balance */}
-            {currentUser ? (
+            {isAuthInitialized && currentUser ? (
               <div className="flex items-center gap-3">
+                {/* Wallet Balance Pill for Talent & Client */}
                 {currentUser.role === 'TALENT' && (
                   <Link 
                     href="/talent/wallet" 
                     className="flex items-center gap-1.5 bg-surface-container-low hover:bg-surface-container border border-outline-variant/50 px-3 py-1.5 rounded-lg text-xs font-mono text-emerald-400 transition-colors"
+                    title="Saldo Dompet Talent"
                   >
                     <Wallet className="w-3.5 h-3.5" />
                     <span>{formatIDR(currentUser.balance)}</span>
                   </Link>
                 )}
 
-                <div className="flex items-center gap-2 pl-2 border-l border-outline-variant/40">
-                  <div className="w-8 h-8 rounded-full overflow-hidden border border-primary/40 bg-surface-container">
-                    <img 
-                      src={currentUser.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100"} 
-                      alt={currentUser.name} 
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="flex flex-col text-left">
-                    <span className="text-xs font-bold text-white leading-tight max-w-[120px] truncate">{currentUser.name}</span>
-                    <span className="text-[10px] font-mono text-primary leading-tight">{currentUser.role}</span>
-                  </div>
+                {currentUser.role === 'CLIENT' && (
+                  <Link 
+                    href="/client/dashboard" 
+                    className="flex items-center gap-1.5 bg-surface-container-low hover:bg-surface-container border border-outline-variant/50 px-3 py-1.5 rounded-lg text-xs font-mono text-blue-400 transition-colors"
+                    title="Deposit Escrow Klien"
+                  >
+                    <Coins className="w-3.5 h-3.5" />
+                    <span>{formatIDR(currentUser.balance)}</span>
+                  </Link>
+                )}
+
+                {/* User Profile Dropdown Menu */}
+                <div className="relative" ref={profileMenuRef}>
+                  <button
+                    onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+                    className="flex items-center gap-2.5 p-1.5 pr-2.5 rounded-xl bg-surface-container border border-outline-variant/60 hover:border-primary/60 transition-all text-left group active:scale-95"
+                    aria-label="Menu Pengguna"
+                  >
+                    <div className="w-8 h-8 rounded-lg overflow-hidden border border-primary/40 bg-surface-container-high flex-shrink-0">
+                      <img 
+                        src={currentUser.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100"} 
+                        alt={currentUser.name} 
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold text-white leading-tight max-w-[130px] truncate group-hover:text-primary transition-colors">
+                        {currentUser.name}
+                      </span>
+                      <span className={`text-[9px] font-mono px-1.5 py-0.2 rounded border w-fit mt-0.5 ${getRoleBadgeStyle(currentUser.role)}`}>
+                        {currentUser.role}
+                      </span>
+                    </div>
+                    <ChevronDown className={`w-3.5 h-3.5 text-on-surface-variant transition-transform ${profileMenuOpen ? 'rotate-180 text-primary' : ''}`} />
+                  </button>
+
+                  {/* Profile Dropdown Content */}
+                  {profileMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-64 bg-surface-container-high border border-outline-variant rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in zoom-in-95 font-body">
+                      
+                      {/* Account Identity Header */}
+                      <div className="px-4 py-2.5 border-b border-outline-variant/40">
+                        <div className="text-xs font-bold text-white truncate">{currentUser.name}</div>
+                        <div className="text-[11px] font-mono text-on-surface-variant truncate">{currentUser.email}</div>
+                        <div className="mt-2 flex items-center justify-between">
+                          <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${getRoleBadgeStyle(currentUser.role)}`}>
+                            Peran: {currentUser.role}
+                          </span>
+                          {currentUser.role === 'TALENT' && (
+                            <span className="text-[10px] font-mono text-amber-400">
+                              ★ {currentUser.reputationScore || 5.0}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Role Specific Actions */}
+                      <div className="py-1">
+                        {currentUser.role === 'TALENT' && (
+                          <>
+                            <Link
+                              href="/talent/dashboard"
+                              onClick={() => setProfileMenuOpen(false)}
+                              className="w-full px-4 py-2 text-xs text-on-surface hover:bg-surface-variant hover:text-white flex items-center gap-2.5 transition-colors"
+                            >
+                              <LayoutDashboard className="w-4 h-4 text-emerald-400" />
+                              <span>Dashboard Talent</span>
+                            </Link>
+                            <Link
+                              href="/talent/portfolio"
+                              onClick={() => setProfileMenuOpen(false)}
+                              className="w-full px-4 py-2 text-xs text-on-surface hover:bg-surface-variant hover:text-white flex items-center gap-2.5 transition-colors"
+                            >
+                              <FolderGit2 className="w-4 h-4 text-indigo-400" />
+                              <span>Portofolio Saya</span>
+                            </Link>
+                            <Link
+                              href="/talent/wallet"
+                              onClick={() => setProfileMenuOpen(false)}
+                              className="w-full px-4 py-2 text-xs text-on-surface hover:bg-surface-variant hover:text-white flex items-center gap-2.5 transition-colors"
+                            >
+                              <Wallet className="w-4 h-4 text-amber-400" />
+                              <span>Dompet &amp; Pencairan Dana</span>
+                            </Link>
+                          </>
+                        )}
+
+                        {currentUser.role === 'CLIENT' && (
+                          <>
+                            <Link
+                              href="/client/dashboard"
+                              onClick={() => setProfileMenuOpen(false)}
+                              className="w-full px-4 py-2 text-xs text-on-surface hover:bg-surface-variant hover:text-white flex items-center gap-2.5 transition-colors"
+                            >
+                              <LayoutDashboard className="w-4 h-4 text-blue-400" />
+                              <span>Dashboard Klien</span>
+                            </Link>
+                            <Link
+                              href="/client/bounties/create"
+                              onClick={() => setProfileMenuOpen(false)}
+                              className="w-full px-4 py-2 text-xs text-on-surface hover:bg-surface-variant hover:text-white flex items-center gap-2.5 transition-colors"
+                            >
+                              <PlusCircle className="w-4 h-4 text-primary" />
+                              <span>Buat Bounty Baru</span>
+                            </Link>
+                          </>
+                        )}
+
+                        {currentUser.role === 'ADMIN' && (
+                          <>
+                            <Link
+                              href="/admin/dashboard"
+                              onClick={() => setProfileMenuOpen(false)}
+                              className="w-full px-4 py-2 text-xs text-on-surface hover:bg-surface-variant hover:text-white flex items-center gap-2.5 transition-colors"
+                            >
+                              <Gavel className="w-4 h-4 text-amber-400" />
+                              <span>Pusat Moderasi (Admin Hub)</span>
+                            </Link>
+                            <Link
+                              href="/admin/withdrawals"
+                              onClick={() => setProfileMenuOpen(false)}
+                              className="w-full px-4 py-2 text-xs text-on-surface hover:bg-surface-variant hover:text-white flex items-center gap-2.5 transition-colors"
+                            >
+                              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                              <span>Verifikasi Penarikan Dana</span>
+                            </Link>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Logout Option */}
+                      <div className="border-t border-outline-variant/40 pt-1 mt-1">
+                        <button
+                          onClick={handleLogout}
+                          className="w-full px-4 py-2 text-xs text-red-400 hover:bg-red-950/40 flex items-center gap-2.5 transition-colors text-left font-medium"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          <span>Keluar dari Akun</span>
+                        </button>
+                      </div>
+
+                    </div>
+                  )}
                 </div>
               </div>
-            ) : (
+            ) : isAuthInitialized ? (
               <div className="flex items-center gap-3">
                 <Link
                   href="/login"
-                  className="text-on-surface-variant hover:text-white font-medium text-sm transition-colors"
+                  className="text-on-surface-variant hover:text-white font-medium text-sm transition-colors px-3 py-1.5"
                 >
-                  Login
+                  Masuk
                 </Link>
                 <Link
                   href="/register"
-                  className="bg-primary text-primary-foreground font-bold px-4 py-2 rounded-lg hover:bg-primary-fixed transition-all text-sm active:scale-95 shadow-md shadow-primary/20"
+                  className="bg-primary text-primary-foreground font-bold px-4 py-2 rounded-xl hover:bg-primary-fixed transition-all text-sm active:scale-95 shadow-md shadow-primary/20"
                 >
                   Daftar
                 </Link>
               </div>
-            )}
+            ) : null}
+
           </div>
 
           {/* Mobile Menu Button */}
@@ -221,6 +340,7 @@ export function Navbar() {
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2 rounded-lg bg-surface-container text-on-surface-variant hover:text-white"
+              aria-label="Buka Menu"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -231,14 +351,56 @@ export function Navbar() {
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-surface-container-low border-b border-outline-variant p-4 space-y-4">
-          <div className="flex flex-col space-y-3 font-medium text-sm">
+        <div className="md:hidden bg-surface-container-low border-b border-outline-variant p-4 space-y-4 font-body animate-in slide-in-from-top-2">
+          
+          {/* User Status in Mobile */}
+          {currentUser ? (
+            <div className="p-3.5 rounded-2xl bg-surface-container border border-outline-variant/60 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl overflow-hidden border border-primary/40 bg-surface-container-high">
+                  <img 
+                    src={currentUser.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100"} 
+                    alt={currentUser.name} 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div>
+                  <div className="text-sm font-bold text-white leading-tight">{currentUser.name}</div>
+                  <div className="text-[11px] font-mono text-on-surface-variant truncate max-w-[170px]">{currentUser.email}</div>
+                  <span className={`inline-block text-[9px] font-mono px-2 py-0.5 rounded border mt-1 ${getRoleBadgeStyle(currentUser.role)}`}>
+                    Peran: {currentUser.role}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              <Link 
+                href="/login" 
+                onClick={() => setMobileMenuOpen(false)}
+                className="py-2.5 text-center bg-surface-container text-white font-medium rounded-xl text-xs border border-outline-variant/50"
+              >
+                Masuk
+              </Link>
+              <Link 
+                href="/register" 
+                onClick={() => setMobileMenuOpen(false)}
+                className="py-2.5 text-center bg-primary text-primary-foreground font-bold rounded-xl text-xs shadow-md shadow-primary/20"
+              >
+                Daftar
+              </Link>
+            </div>
+          )}
+
+          {/* Nav Links */}
+          <div className="flex flex-col space-y-1.5 font-medium text-sm pt-2">
             <Link 
               href="/bounties" 
               onClick={() => setMobileMenuOpen(false)}
-              className="px-3 py-2 rounded-lg hover:bg-surface-variant text-white"
+              className="px-3 py-2.5 rounded-xl hover:bg-surface-variant text-white flex items-center gap-2.5"
             >
-              Marketplace Bounty
+              <Code2 className="w-4 h-4 text-primary" />
+              <span>Marketplace Bounty</span>
             </Link>
 
             {currentUser?.role === 'TALENT' && (
@@ -246,23 +408,29 @@ export function Navbar() {
                 <Link 
                   href="/talent/dashboard" 
                   onClick={() => setMobileMenuOpen(false)}
-                  className="px-3 py-2 rounded-lg hover:bg-surface-variant text-white"
+                  className="px-3 py-2.5 rounded-xl hover:bg-surface-variant text-white flex items-center gap-2.5"
                 >
-                  Dashboard Talent
+                  <LayoutDashboard className="w-4 h-4 text-emerald-400" />
+                  <span>Dashboard Talent</span>
                 </Link>
                 <Link 
                   href="/talent/portfolio" 
                   onClick={() => setMobileMenuOpen(false)}
-                  className="px-3 py-2 rounded-lg hover:bg-surface-variant text-white"
+                  className="px-3 py-2.5 rounded-xl hover:bg-surface-variant text-white flex items-center gap-2.5"
                 >
-                  Kelola Portofolio
+                  <FolderGit2 className="w-4 h-4 text-indigo-400" />
+                  <span>Kelola Portofolio</span>
                 </Link>
                 <Link 
                   href="/talent/wallet" 
                   onClick={() => setMobileMenuOpen(false)}
-                  className="px-3 py-2 rounded-lg hover:bg-surface-variant text-emerald-400"
+                  className="px-3 py-2.5 rounded-xl hover:bg-surface-variant text-emerald-400 flex items-center justify-between"
                 >
-                  Dompet ({formatIDR(currentUser.balance)})
+                  <span className="flex items-center gap-2.5">
+                    <Wallet className="w-4 h-4" />
+                    <span>Dompet Talent</span>
+                  </span>
+                  <span className="font-mono text-xs font-bold">{formatIDR(currentUser.balance)}</span>
                 </Link>
               </>
             )}
@@ -272,16 +440,18 @@ export function Navbar() {
                 <Link 
                   href="/client/dashboard" 
                   onClick={() => setMobileMenuOpen(false)}
-                  className="px-3 py-2 rounded-lg hover:bg-surface-variant text-white"
+                  className="px-3 py-2.5 rounded-xl hover:bg-surface-variant text-white flex items-center gap-2.5"
                 >
-                  Dashboard Klien
+                  <LayoutDashboard className="w-4 h-4 text-blue-400" />
+                  <span>Dashboard Klien</span>
                 </Link>
                 <Link 
                   href="/client/bounties/create" 
                   onClick={() => setMobileMenuOpen(false)}
-                  className="px-3 py-2 rounded-lg hover:bg-surface-variant text-primary"
+                  className="px-3 py-2.5 rounded-xl hover:bg-surface-variant text-primary flex items-center gap-2.5 font-bold"
                 >
-                  + Buat Bounty Baru
+                  <PlusCircle className="w-4 h-4" />
+                  <span>+ Buat Bounty Baru</span>
                 </Link>
               </>
             )}
@@ -291,44 +461,36 @@ export function Navbar() {
                 <Link 
                   href="/admin/dashboard" 
                   onClick={() => setMobileMenuOpen(false)}
-                  className="px-3 py-2 rounded-lg hover:bg-surface-variant text-white"
+                  className="px-3 py-2.5 rounded-xl hover:bg-surface-variant text-white flex items-center gap-2.5"
                 >
-                  Admin Hub
+                  <Gavel className="w-4 h-4 text-amber-400" />
+                  <span>Admin Hub</span>
                 </Link>
                 <Link 
                   href="/admin/withdrawals" 
                   onClick={() => setMobileMenuOpen(false)}
-                  className="px-3 py-2 rounded-lg hover:bg-surface-variant text-amber-400"
+                  className="px-3 py-2.5 rounded-xl hover:bg-surface-variant text-amber-400 flex items-center gap-2.5"
                 >
-                  Verifikasi Penarikan Dana
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Verifikasi Penarikan Dana</span>
                 </Link>
               </>
             )}
           </div>
 
-          <div className="pt-3 border-t border-outline-variant/40 flex flex-col gap-2">
-            <div className="text-[11px] font-mono text-on-surface-variant">Role Testing Simulator:</div>
-            <div className="grid grid-cols-3 gap-2">
+          {/* Mobile Logout Button */}
+          {currentUser && (
+            <div className="pt-3 border-t border-outline-variant/40">
               <button 
-                onClick={() => { switchUserRole('TALENT'); setMobileMenuOpen(false); router.push('/talent/dashboard'); }}
-                className={`py-1.5 text-xs rounded border text-center ${currentUser?.role === 'TALENT' ? 'bg-primary text-black font-bold' : 'bg-surface-variant text-white'}`}
+                onClick={handleLogout}
+                className="w-full py-2.5 px-3 rounded-xl bg-red-950/20 border border-red-500/30 text-red-400 font-medium text-xs flex items-center justify-center gap-2 transition-colors"
               >
-                Talent
-              </button>
-              <button 
-                onClick={() => { switchUserRole('CLIENT'); setMobileMenuOpen(false); router.push('/client/dashboard'); }}
-                className={`py-1.5 text-xs rounded border ${currentUser?.role === 'CLIENT' ? 'bg-primary text-black font-bold' : 'bg-surface-variant text-white'}`}
-              >
-                Client
-              </button>
-              <button 
-                onClick={() => { switchUserRole('ADMIN'); setMobileMenuOpen(false); router.push('/admin/dashboard'); }}
-                className={`py-1.5 text-xs rounded border ${currentUser?.role === 'ADMIN' ? 'bg-primary text-black font-bold' : 'bg-surface-variant text-white'}`}
-              >
-                Admin
+                <LogOut className="w-4 h-4" />
+                <span>Keluar dari Akun</span>
               </button>
             </div>
-          </div>
+          )}
+
         </div>
       )}
     </nav>

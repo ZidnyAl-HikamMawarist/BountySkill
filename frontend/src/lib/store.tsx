@@ -7,6 +7,7 @@ import api from './api-client';
 
 interface AppContextType {
   currentUser: User | null;
+  isAuthInitialized: boolean;
   users: User[];
   portfolios: PortfolioItem[];
   bounties: Bounty[];
@@ -49,7 +50,8 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [users, setUsers] = useState<User[]>(initialUsers);
-  const [currentUser, setCurrentUser] = useState<User | null>(initialUsers[0]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isAuthInitialized, setIsAuthInitialized] = useState<boolean>(false);
   const [portfolios, setPortfolios] = useState<PortfolioItem[]>(initialPortfolios);
   const [bounties, setBounties] = useState<Bounty[]>(initialBounties);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>(initialWithdrawals);
@@ -78,9 +80,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Initial load
+  // Initial load from local storage
   useEffect(() => {
     try {
+      const savedUser = localStorage.getItem('sb_current_user');
+      if (savedUser) {
+        setCurrentUser(JSON.parse(savedUser));
+      }
+
       const savedBounties = localStorage.getItem('sb_bounties');
       if (savedBounties) setBounties(JSON.parse(savedBounties));
       
@@ -94,6 +101,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (savedDisputes) setDisputes(JSON.parse(savedDisputes));
     } catch (e) {
       console.error('Failed to load local storage state', e);
+    } finally {
+      setIsAuthInitialized(true);
     }
 
     refreshData();
@@ -111,13 +120,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [bounties, portfolios, withdrawals, disputes]);
 
+  // Save user session when changed
+  useEffect(() => {
+    if (!isAuthInitialized) return;
+    try {
+      if (currentUser) {
+        localStorage.setItem('sb_current_user', JSON.stringify(currentUser));
+      } else {
+        localStorage.removeItem('sb_current_user');
+      }
+    } catch (e) {
+      console.error('Failed to save user session', e);
+    }
+  }, [currentUser, isAuthInitialized]);
+
   const switchUserRole = (role: Role | 'GUEST') => {
     if (role === 'GUEST') {
-      setCurrentUser(null);
+      logoutUser();
       return;
     }
     const found = users.find(u => u.role === role);
-    if (found) setCurrentUser(found);
+    if (found) {
+      setCurrentUser(found);
+      localStorage.setItem('sb_current_user', JSON.stringify(found));
+    }
   };
 
   const loginUser = (email: string, role?: Role): boolean => {
@@ -128,15 +154,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     }).catch(() => {});
 
-    const found = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    const cleanEmail = email.trim().toLowerCase();
+    const found = users.find(u => u.email.toLowerCase() === cleanEmail);
     if (found) {
       setCurrentUser(found);
+      localStorage.setItem('sb_current_user', JSON.stringify(found));
       return true;
     }
     if (role) {
       const byRole = users.find(u => u.role === role);
       if (byRole) {
         setCurrentUser(byRole);
+        localStorage.setItem('sb_current_user', JSON.stringify(byRole));
         return true;
       }
     }
@@ -154,7 +183,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const newUser: User = {
       id: `user-${Date.now()}`,
       name,
-      email,
+      email: email.trim().toLowerCase(),
       role,
       balance: role === 'CLIENT' ? 5000000 : 0,
       reputationScore: 5.0,
@@ -163,11 +192,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setUsers(prev => [...prev, newUser]);
     setCurrentUser(newUser);
+    localStorage.setItem('sb_current_user', JSON.stringify(newUser));
     return newUser;
   };
 
   const logoutUser = () => {
     localStorage.removeItem('sb_auth_token');
+    localStorage.removeItem('sb_current_user');
     setCurrentUser(null);
   };
 
@@ -486,6 +517,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   return (
     <AppContext.Provider value={{
       currentUser,
+      isAuthInitialized,
       users,
       portfolios,
       bounties,

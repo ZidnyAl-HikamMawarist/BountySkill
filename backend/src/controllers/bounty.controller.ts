@@ -245,7 +245,11 @@ export async function createBounty(req: AuthenticatedRequest, res: Response, nex
       paymentMethod
     } = req.body;
 
-    const clientId = req.user?.userId || 'user-client-1';
+    if (!req.user?.userId) {
+      return res.status(401).json({ success: false, message: 'Autentikasi akun diperlukan untuk membuat bounty.' });
+    }
+
+    const clientId = req.user.userId;
 
     const feePlatform = Math.round(budget * 0.1);
     const netAmount = budget - feePlatform;

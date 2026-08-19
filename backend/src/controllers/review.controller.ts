@@ -15,7 +15,12 @@ export async function addReview(req: AuthenticatedRequest, res: Response, next: 
   try {
     const { bountyId } = req.params;
     const { rating, comment } = req.body;
-    const reviewerId = req.user?.userId || 'user-client-1';
+
+    if (!req.user?.userId) {
+      return res.status(401).json({ success: false, message: 'Autentikasi akun diperlukan untuk memberikan ulasan.' });
+    }
+
+    const reviewerId = req.user.userId;
 
     const bounty = await prisma.bounty.findUnique({
       where: { id: bountyId },
@@ -33,12 +38,17 @@ export async function addReview(req: AuthenticatedRequest, res: Response, next: 
     }
 
     // IDOR & Authorization check: only client of this bounty or admin can leave review
-    if (req.user && req.user.role === 'CLIENT' && bounty.clientId !== req.user.userId) {
+    if (req.user.role === 'CLIENT' && bounty.clientId !== req.user.userId) {
       return res.status(403).json({ success: false, message: 'Hanya klien pembuat bounty yang dapat memberikan ulasan.' });
     }
 
-    const talentId = bounty.submissions[0]?.talentId || 'user-talent-1';
-    const talentName = bounty.submissions[0]?.talent.name || 'Talenta';
+    const acceptedSub = bounty.submissions[0];
+    if (!acceptedSub) {
+      return res.status(400).json({ success: false, message: 'Ulasan hanya dapat diberikan setelah hasil pengerjaan talenta disetujui.' });
+    }
+
+    const talentId = acceptedSub.talentId;
+    const talentName = acceptedSub.talent.name || 'Talenta';
 
     // Upsert review
     const review = await prisma.review.upsert({

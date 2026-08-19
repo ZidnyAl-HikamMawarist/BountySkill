@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useAppStore } from '@/lib/store';
+import { RoleGuard } from '@/components/auth/role-guard';
 import { PortfolioItem } from '@/types';
 import { 
   Plus, 
@@ -23,6 +24,14 @@ import { Github } from '@/components/ui/icons';
 import { EmptyState } from '@/components/ui/state-kit';
 
 export default function TalentPortfolioManagePage() {
+  return (
+    <RoleGuard allowedRoles={['TALENT']} pageTitle="Kelola Portofolio Talent">
+      <TalentPortfolioContent />
+    </RoleGuard>
+  );
+}
+
+function TalentPortfolioContent() {
   const { portfolios, addPortfolio, updatePortfolio, deletePortfolio, currentUser } = useAppStore();
 
   const [isModalOpen, setIsModalOpen] = useState(false);

@@ -16,7 +16,12 @@ export const withdrawalSchema = z.object({
 export async function requestWithdrawal(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   try {
     const { amount, bankName, accountNum, accountName } = req.body;
-    const userId = req.user?.userId || 'user-talent-1';
+    
+    if (!req.user?.userId) {
+      return res.status(401).json({ success: false, message: 'Autentikasi akun diperlukan untuk mengajukan penarikan dana.' });
+    }
+
+    const userId = req.user.userId;
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
@@ -76,7 +81,11 @@ export async function requestWithdrawal(req: AuthenticatedRequest, res: Response
 
 export async function listMyWithdrawals(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   try {
-    const userId = req.user?.userId || 'user-talent-1';
+    if (!req.user?.userId) {
+      return res.status(401).json({ success: false, message: 'Autentikasi akun diperlukan.' });
+    }
+
+    const userId = req.user.userId;
 
     const withdrawals = await prisma.withdrawal.findMany({
       where: { userId },

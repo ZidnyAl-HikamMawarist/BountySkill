@@ -60,7 +60,12 @@ export async function listPortfolios(req: Request, res: Response, next: NextFunc
 export async function addPortfolio(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   try {
     const { title, description, demoUrl, repoUrl, techTags } = req.body;
-    const userId = req.user?.userId || 'user-talent-1';
+
+    if (!req.user?.userId) {
+      return res.status(401).json({ success: false, message: 'Autentikasi akun diperlukan untuk menambahkan portofolio.' });
+    }
+
+    const userId = req.user.userId;
 
     const item = await prisma.portfolioItem.create({
       data: {

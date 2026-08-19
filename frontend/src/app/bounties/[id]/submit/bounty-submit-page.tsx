@@ -4,6 +4,7 @@ import React, { useState, use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
+import { RoleGuard } from '@/components/auth/role-guard';
 import { 
   Send, 
   ArrowLeft, 
@@ -15,10 +16,18 @@ import {
   Clock,
   ShieldCheck
 } from 'lucide-react';
-import { Github } from '@/components/ui/icons';
 import { EmptyState } from '@/components/ui/state-kit';
+import { Github } from '@/components/ui/icons';
 
 export default function BountySubmitPage({ params }: { params: Promise<{ id: string }> }) {
+  return (
+    <RoleGuard allowedRoles={['TALENT']} pageTitle="Kirim Hasil Pekerjaan Bounty">
+      <BountySubmitContent params={params} />
+    </RoleGuard>
+  );
+}
+
+function BountySubmitContent({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const { id } = resolvedParams;
   const router = useRouter();

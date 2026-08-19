@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useAppStore } from '@/lib/store';
+import { RoleGuard } from '@/components/auth/role-guard';
 import { 
   Wallet, 
   ArrowUpRight, 
@@ -21,6 +22,14 @@ import {
 import { EmptyState } from '@/components/ui/state-kit';
 
 export default function TalentWalletPage() {
+  return (
+    <RoleGuard allowedRoles={['TALENT']} pageTitle="Dompet & Pencairan Dana Talent">
+      <TalentWalletContent />
+    </RoleGuard>
+  );
+}
+
+function TalentWalletContent() {
   const { currentUser, withdrawals, requestWithdrawal, bounties } = useAppStore();
 
   const [amount, setAmount] = useState<number>(1000000);
